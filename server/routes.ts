@@ -2380,37 +2380,46 @@ export async function registerRoutes(app: Express, swapClient: SimpleSwapClient 
       const giftCardSecret = identity.toString();
 
       // Create unique order ID
-      const orderId = nanoid();
+      const orderId = crypto.randomUUID();
 
-      // Get crypto price from exchange
-      const priceResponse = await exchangeService.getEstimatedExchangeAmount(
-        currency,
-        "USD",
-        denomination
-      );
-
-      if (!priceResponse.success || !priceResponse.depositAddress) {
+      // Check if simpleSwapClient is available
+      if (!simpleSwapClient) {
         return res.status(500).json({ 
           ok: false, 
-          error: "Failed to get exchange rate. Please try again." 
+          error: "Exchange service not available" 
         });
       }
 
+      // Create exchange for gift card payment
+      const exchange = await simpleSwapClient.createExchange({
+        currencyFrom: currency.toLowerCase(),
+        currencyTo: 'usd',
+        amountFrom: denomination.toString(),
+        addressTo: walletService.getEVMAddress(), // Operator wallet receives USD
+      });
+
+      if (!exchange || !exchange.addressFrom) {
+        return res.status(500).json({ 
+          ok: false, 
+          error: "Failed to create exchange. Please try again." 
+        });
+      }
+
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
       // Create gift card order in database
-      const order = await storage.createGiftCardOrder({
+      const order = await storage.createGiftCardOrder(
         orderId,
         giftCardType,
         denomination,
-        priceUSD: denomination,
+        denomination, // priceUSD
         currency,
-        amountCrypto: parseFloat(priceResponse.estimatedAmount),
-        depositAddress: priceResponse.depositAddress,
-        exchangeId: priceResponse.exchangeId,
+        parseFloat(exchange.amountFrom || '0'),
+        exchange.addressFrom, // depositAddress
         zkCommitment,
-        paymentStatus: 'pending',
-        orderStatus: 'created',
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-      });
+        expiresAt,
+        exchange.id // exchangeId
+      );
 
       // Add commitment to Semaphore group
       try {
@@ -2431,12 +2440,13 @@ export async function registerRoutes(app: Express, swapClient: SimpleSwapClient 
           denomination,
           priceUSD: denomination,
           currency,
-          amountCrypto: parseFloat(priceResponse.estimatedAmount),
-          depositAddress: priceResponse.depositAddress,
-          expiresAt: order.expiresAt,
+          amountCrypto: parseFloat(exchange.amountFrom || '0'),
+          depositAddress: exchange.addressFrom,
+          expiresAt,
           paymentStatus: 'pending',
           zkCommitment,
-          giftCardSecret
+          giftCardSecret,
+          exchangeId: exchange.id
         }
       });
     } catch (error: any) {
@@ -2907,13 +2917,18 @@ export async function registerRoutes(app: Express, swapClient: SimpleSwapClient 
     try {
       const { status } = req.query;
 
-      let query = db.select().from(bugReports);
-
+      let bugs;
+      
       if (status && typeof status === 'string' && ['new', 'in_progress', 'fixed'].includes(status)) {
-        query = query.where(eq(bugReports.status, status));
+        bugs = await db.select()
+          .from(bugReports)
+          .where(eq(bugReports.status, status as any))
+          .orderBy(desc(bugReports.createdAt));
+      } else {
+        bugs = await db.select()
+          .from(bugReports)
+          .orderBy(desc(bugReports.createdAt));
       }
-
-      const bugs = await query.orderBy(desc(bugReports.createdAt));
 
       res.json({ ok: true, bugs });
     } catch (error: any) {
