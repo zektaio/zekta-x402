@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Menu } from 'lucide-react';
+import { Menu, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import Logo from './Logo';
 
 const navLinks = [
   { href: '/', label: 'Home' },
+  { href: '/docs', label: 'Docs' },
+  { href: '/mvp', label: 'Launch MVP' },
   { href: '/x402', label: 'x402 Marketplace' },
-  { href: '/docs', label: 'Documentation' },
-  { href: '/blog/x402-documentation', label: 'Blog' },
+  { href: '/domain-feature', label: 'Anonymous Domains' },
+  { href: '/my-domains', label: 'My Domains' },
+  { href: '/bugs', label: 'Bug Reports' },
 ];
 
 export default function Header() {
@@ -45,6 +48,17 @@ export default function Header() {
               {link.label}
             </Link>
           ))}
+          <Link href="/zekta-update">
+            <Button 
+              size="sm" 
+              variant="default"
+              className="gap-2"
+              data-testid="button-project-update"
+            >
+              <Sparkles className="h-4 w-4" />
+              Project Update
+            </Button>
+          </Link>
         </nav>
 
         {/* Mobile Hamburger Menu */}
@@ -73,6 +87,17 @@ export default function Header() {
                   {link.label}
                 </Link>
               ))}
+              <Link href="/zekta-update" onClick={() => setMobileMenuOpen(false)}>
+                <Button 
+                  size="sm" 
+                  variant="default"
+                  className="w-full gap-2"
+                  data-testid="mobile-button-project-update"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Project Update
+                </Button>
+              </Link>
             </div>
           </SheetContent>
         </Sheet>

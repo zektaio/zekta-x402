@@ -6,24 +6,24 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center space-y-4">
           <p className="text-sm text-muted-foreground">
-            © 2025 Zekta. Zero-Knowledge Identity for x402 Protocol.
+            © 2025 Zekta. Zero-Knowledge Action Layer.
           </p>
           
           <div className="flex flex-wrap items-center justify-center gap-6 text-sm">
             <Link 
-              href="/x402"
+              href="/blog/zcash-support-announcement"
               className="text-muted-foreground hover:text-primary transition-colors"
-              data-testid="link-marketplace"
+              data-testid="link-blog-zec"
             >
-              x402 Marketplace
+              ZEC Announcement
             </Link>
             
             <Link 
-              href="/blog/x402-documentation"
+              href="/blog/revenue-share-test-completed"
               className="text-muted-foreground hover:text-primary transition-colors"
-              data-testid="link-blog-x402"
+              data-testid="link-blog-revenue"
             >
-              x402 Documentation
+              Revenue Distribution
             </Link>
             
             <Link 
