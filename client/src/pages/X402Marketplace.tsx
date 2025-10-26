@@ -34,6 +34,14 @@ interface X402User {
   createdAt: Date;
 }
 
+interface X402Purchase {
+  id: number;
+  service: X402Service;
+  priceUSDPaid: number;
+  purchaseDate: string;
+  txHash: string | null;
+}
+
 const CATEGORY_ICONS: Record<string, any> = {
   AI: Sparkles,
   Data: Database,
@@ -64,7 +72,13 @@ export default function X402Marketplace() {
     queryKey: ['/api/x402/services'],
   });
 
+  const { data: purchasesResponse } = useQuery<{ ok: boolean; purchases: X402Purchase[] }>({
+    queryKey: ['/api/x402/purchases'],
+    enabled: !!currentUser,
+  });
+
   const services = servicesResponse?.services || [];
+  const purchases = purchasesResponse?.purchases || [];
   const categories = ['All', ...new Set(services.map(s => s.category))];
 
   const filteredServices = services.filter(service => {
@@ -608,6 +622,74 @@ export default function X402Marketplace() {
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Purchase History Section */}
+          {currentUser && purchases.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.5 }}
+              className="mt-16"
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <History className="w-6 h-6 text-emerald-400 flex-shrink-0" />
+                    Purchase History
+                  </CardTitle>
+                  <CardDescription>
+                    Your recent service purchases and transactions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {purchases.map((purchase) => (
+                      <div
+                        key={purchase.id}
+                        className="flex items-center justify-between p-4 border border-border rounded-md hover-elevate"
+                        data-testid={`purchase-${purchase.id}`}
+                      >
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            {CATEGORY_ICONS[purchase.service.category] && (
+                              <div className="w-5 h-5 text-primary">
+                                {(() => {
+                                  const Icon = CATEGORY_ICONS[purchase.service.category];
+                                  return <Icon className="w-5 h-5" />;
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold">{purchase.service.name}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(purchase.purchaseDate).toLocaleDateString()} at{' '}
+                              {new Date(purchase.purchaseDate).toLocaleTimeString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <Badge variant="outline" className="font-mono">
+                            ${purchase.priceUSDPaid.toFixed(4)}
+                          </Badge>
+                          {purchase.txHash && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => window.open(`https://basescan.org/tx/${purchase.txHash}`, '_blank')}
+                              data-testid={`button-view-tx-${purchase.id}`}
+                            >
+                              <ExternalLink className="w-4 h-4 flex-shrink-0" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
 
           {/* Info Section */}
           <motion.div
