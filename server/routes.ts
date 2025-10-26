@@ -3039,51 +3039,248 @@ export async function registerRoutes(app: Express, swapClient: SimpleSwapClient 
     }
   });
 
-  // x402 Service Purchase Endpoint - 2-stage payment flow
+  // ============================================================================
+  // x402 zkID Authentication System
+  // ============================================================================
+
+  // Register new zkID user with Semaphore commitment
+  app.post("/api/x402/auth/register", async (req, res) => {
+    try {
+      const { zkCommitment } = req.body;
+      
+      if (!zkCommitment) {
+        return res.status(400).json({ ok: false, error: "zkCommitment required" });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getX402UserByCommitment(zkCommitment);
+      if (existingUser) {
+        return res.status(400).json({ ok: false, error: "User already registered" });
+      }
+
+      // Create new user
+      const { id } = await storage.createX402User(zkCommitment);
+      
+      res.json({ 
+        ok: true, 
+        userId: id,
+        message: "zkID registered successfully" 
+      });
+
+    } catch (error: any) {
+      console.error("❌ zkID registration failed:", error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Login with zkID commitment (simplified - no ZK proof verification yet)
+  app.post("/api/x402/auth/login", async (req, res) => {
+    try {
+      const { zkCommitment } = req.body;
+      
+      if (!zkCommitment) {
+        return res.status(400).json({ ok: false, error: "zkCommitment required" });
+      }
+
+      // Get user
+      const user = await storage.getX402UserByCommitment(zkCommitment);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      res.json({ 
+        ok: true, 
+        user: {
+          id: user.id,
+          zkCommitment: user.zkCommitment,
+          creditBalanceUSD: user.creditBalanceUSD,
+          createdAt: user.createdAt
+        }
+      });
+
+    } catch (error: any) {
+      console.error("❌ zkID login failed:", error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Get user info by commitment
+  app.get("/api/x402/auth/me/:zkCommitment", async (req, res) => {
+    try {
+      const { zkCommitment } = req.params;
+      
+      const user = await storage.getX402UserByCommitment(zkCommitment);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      res.json({ ok: true, user });
+
+    } catch (error: any) {
+      console.error("❌ Failed to get user info:", error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // x402 Credit Management System
+  // ============================================================================
+
+  // Top-up credits with dual payment options
+  app.post("/api/x402/credits/topup", async (req, res) => {
+    try {
+      const { zkCommitment, amountUSD, paymentMethod, currency, amountCrypto, amountZekta } = req.body;
+      
+      if (!zkCommitment || !amountUSD || !paymentMethod) {
+        return res.status(400).json({ ok: false, error: "Missing required fields" });
+      }
+
+      // Get user
+      const user = await storage.getX402UserByCommitment(zkCommitment);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      // Create credit transaction
+      const { id: txId } = await storage.createX402CreditTransaction(
+        user.id,
+        amountUSD,
+        paymentMethod,
+        currency || null,
+        amountCrypto || null,
+        amountZekta || null
+      );
+
+      // TODO: Process payment based on method
+      // For now, simulate pending transaction
+      
+      res.json({ 
+        ok: true, 
+        transactionId: txId,
+        status: 'pending',
+        message: `Awaiting ${paymentMethod} payment confirmation...`
+      });
+
+    } catch (error: any) {
+      console.error("❌ Credit top-up failed:", error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Get transaction history
+  app.get("/api/x402/credits/transactions/:zkCommitment", async (req, res) => {
+    try {
+      const { zkCommitment } = req.params;
+      
+      const user = await storage.getX402UserByCommitment(zkCommitment);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      const transactions = await storage.getX402CreditTransactions(user.id);
+      
+      res.json({ ok: true, transactions });
+
+    } catch (error: any) {
+      console.error("❌ Failed to get transactions:", error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // ============================================================================
+  // x402 Service Purchase Flow
+  // ============================================================================
+
+  // Purchase x402 service with credits
   app.post("/api/x402/purchase/:serviceId", async (req, res) => {
     try {
       const { serviceId } = req.params;
-      const { paymentCurrency, amountCrypto, zkCommitment, walletAddress } = req.body;
+      const { zkCommitment } = req.body;
 
-      if (!x402Client) {
-        return res.status(500).json({ ok: false, error: "x402 client not configured" });
+      if (!zkCommitment) {
+        return res.status(400).json({ ok: false, error: "zkCommitment required" });
       }
 
-      // Get service details
+      // Get user
+      const user = await storage.getX402UserByCommitment(zkCommitment);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      // Get service
       const service = await storage.getX402Service(parseInt(serviceId));
       if (!service) {
         return res.status(404).json({ ok: false, error: "Service not found" });
       }
 
-      // Create purchase record (pending)
-      const [purchase] = await db.insert(x402Purchases).values({
-        serviceId: parseInt(serviceId),
-        zkCommitment: zkCommitment || null,
-        walletAddress: walletAddress || null,
-        paymentCurrency,
-        amountCrypto,
-        amountUSD: service.priceUSD,
-        paymentStatus: 'pending',
-      }).returning();
+      // Check balance
+      if (user.creditBalanceUSD < service.priceUSD) {
+        return res.status(400).json({ 
+          ok: false, 
+          error: "Insufficient credits",
+          required: service.priceUSD,
+          available: user.creditBalanceUSD
+        });
+      }
 
-      // TODO: In production, this should:
-      // 1. Wait for zkSwap payment confirmation (USDC Base arrives in operator wallet)
-      // 2. Use x402Client.callService() to pay for x402 service
-      // 3. Return service response to user
+      // Create purchase
+      const { id: purchaseId } = await storage.createX402Purchase(
+        user.id,
+        service.id,
+        service.priceUSD
+      );
+
+      // Deduct credits
+      await storage.updateX402UserBalance(
+        user.id, 
+        user.creditBalanceUSD - service.priceUSD
+      );
+
+      // Log purchase initiation
+      await storage.createX402PurchaseLog(
+        purchaseId,
+        'info',
+        'Purchase initiated',
+        JSON.stringify({ service: service.name, price: service.priceUSD })
+      );
+
+      // TODO: Process x402 payment with x402Client
+      // For now, simulate pending
       
-      // For now, simulate successful purchase
       res.json({ 
         ok: true, 
-        purchaseId: purchase.id,
-        message: "Purchase initiated. Waiting for payment confirmation...",
+        purchaseId,
+        status: 'pending',
+        message: "Processing x402 payment...",
         service: {
           name: service.name,
-          price: service.priceUSD,
-        }
+          price: service.priceUSD
+        },
+        newBalance: user.creditBalanceUSD - service.priceUSD
       });
 
     } catch (error: any) {
-      console.error("❌ Failed to process x402 purchase:", error);
+      console.error("❌ Purchase failed:", error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  });
+
+  // Get purchase history
+  app.get("/api/x402/purchases/:zkCommitment", async (req, res) => {
+    try {
+      const { zkCommitment } = req.params;
+      
+      const user = await storage.getX402UserByCommitment(zkCommitment);
+      if (!user) {
+        return res.status(404).json({ ok: false, error: "User not found" });
+      }
+
+      const purchases = await storage.getX402PurchasesByUser(user.id);
+      
+      res.json({ ok: true, purchases });
+
+    } catch (error: any) {
+      console.error("❌ Failed to get purchases:", error);
       res.status(500).json({ ok: false, error: error.message });
     }
   });
