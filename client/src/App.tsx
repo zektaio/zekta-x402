@@ -92,7 +92,7 @@ function Router() {
       <Route path="/report-bug" component={ReportBug} />
       <Route path="/bugs/admin" component={BugsAdmin} />
       <Route path="/bugs" component={Bugs} />
-      <Route path="/x402" component={X402Marketplace} />
+      <Route path="/x402marketplace" component={X402Marketplace} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -15,7 +15,7 @@ export default function X402DocumentationUpdate() {
           <nav className="hidden md:flex items-center gap-4">
             <Link href="/" className="text-sm font-medium text-gray-600 hover:text-gray-900">Home</Link>
             <Link href="/docs" className="text-sm font-medium text-gray-600 hover:text-gray-900">Docs</Link>
-            <Link href="/x402" className="text-sm font-medium text-gray-600 hover:text-gray-900">x402 Marketplace</Link>
+            <Link href="/x402marketplace" className="text-sm font-medium text-gray-600 hover:text-gray-900">x402 Marketplace</Link>
           </nav>
         </div>
       </header>
@@ -457,7 +457,7 @@ export default function X402DocumentationUpdate() {
 
           {/* Footer Links */}
           <div className="mt-8 pt-6 border-t border-gray-200 flex flex-wrap gap-3">
-            <Link href="/x402">
+            <Link href="/x402marketplace">
               <button className="px-5 py-2 bg-gray-900 text-white text-sm rounded hover:bg-gray-800 font-medium" data-testid="button-x402-marketplace">
                 Try x402 Marketplace
               </button>

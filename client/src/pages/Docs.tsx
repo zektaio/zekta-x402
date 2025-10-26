@@ -649,7 +649,7 @@ export default function Docs() {
 
               <div className="flex gap-3">
                 <Button asChild className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
-                  <Link href="/x402">Create Your zkID</Link>
+                  <Link href="/x402marketplace">Create Your zkID</Link>
                 </Button>
               </div>
             </div>
@@ -1422,7 +1422,7 @@ app.listen(3000);`}
 
               <div className="flex gap-3">
                 <Button asChild className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700">
-                  <Link href="/x402">Try x402 Marketplace</Link>
+                  <Link href="/x402marketplace">Try x402 Marketplace</Link>
                 </Button>
                 <Button asChild variant="outline">
                   <Link href="/blog/x402-documentation">Read Technical Docs</Link>
