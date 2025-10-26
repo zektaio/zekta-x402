@@ -42,6 +42,15 @@ interface X402Purchase {
   txHash: string | null;
 }
 
+interface CreditTransaction {
+  id: number;
+  amountUSD: number;
+  type: 'topup' | 'spend';
+  description: string;
+  txHash: string | null;
+  createdAt: string;
+}
+
 const CATEGORY_ICONS: Record<string, any> = {
   AI: Sparkles,
   Data: Database,
@@ -77,8 +86,14 @@ export default function X402Marketplace() {
     enabled: !!currentUser,
   });
 
+  const { data: transactionsResponse } = useQuery<{ ok: boolean; transactions: CreditTransaction[] }>({
+    queryKey: ['/api/x402/credits/transactions'],
+    enabled: !!currentUser,
+  });
+
   const services = servicesResponse?.services || [];
   const purchases = purchasesResponse?.purchases || [];
+  const transactions = transactionsResponse?.transactions || [];
   const categories = ['All', ...new Set(services.map(s => s.category))];
 
   const filteredServices = services.filter(service => {
@@ -622,6 +637,87 @@ export default function X402Marketplace() {
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Transaction History Section */}
+          {currentUser && transactions.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.5 }}
+              className="mt-16"
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="w-6 h-6 text-blue-400 flex-shrink-0" />
+                    Transaction History
+                  </CardTitle>
+                  <CardDescription>
+                    Your credit top-ups and spending activity
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {transactions.map((tx) => (
+                      <div
+                        key={tx.id}
+                        className="flex items-center justify-between p-4 border border-border rounded-md hover-elevate"
+                        data-testid={`transaction-${tx.id}`}
+                      >
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className={`w-10 h-10 rounded-md flex items-center justify-center flex-shrink-0 ${
+                            tx.type === 'topup' 
+                              ? 'bg-emerald-500/20' 
+                              : 'bg-red-500/20'
+                          }`}>
+                            <DollarSign className={`w-5 h-5 ${
+                              tx.type === 'topup' 
+                                ? 'text-emerald-400' 
+                                : 'text-red-400'
+                            }`} />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold">
+                              {tx.type === 'topup' ? 'Credit Top-Up' : 'Service Purchase'}
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                              {tx.description}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {new Date(tx.createdAt).toLocaleDateString()} at{' '}
+                              {new Date(tx.createdAt).toLocaleTimeString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <Badge 
+                            variant="outline" 
+                            className={`font-mono ${
+                              tx.type === 'topup'
+                                ? 'border-emerald-500/50 text-emerald-400'
+                                : 'border-red-500/50 text-red-400'
+                            }`}
+                          >
+                            {tx.type === 'topup' ? '+' : '-'}${Math.abs(tx.amountUSD).toFixed(2)}
+                          </Badge>
+                          {tx.txHash && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => window.open(`https://basescan.org/tx/${tx.txHash}`, '_blank')}
+                              data-testid={`button-view-tx-${tx.id}`}
+                            >
+                              <ExternalLink className="w-4 h-4 flex-shrink-0" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
 
           {/* Purchase History Section */}
           {currentUser && purchases.length > 0 && (
