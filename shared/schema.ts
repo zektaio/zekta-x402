@@ -307,12 +307,44 @@ export const insertLoyalHoldersSchema = createInsertSchema(loyalHolders).omit({ 
 export type InsertLoyalHolder = z.infer<typeof insertLoyalHoldersSchema>;
 export type LoyalHolder = typeof loyalHolders.$inferSelect;
 
+// x402 Users Table (Database) - zkID authentication with Semaphore commitments
+export const x402Users = pgTable("x402_users", {
+  id: serial("id").primaryKey(),
+  zkCommitment: varchar("zk_commitment", { length: 255 }).notNull().unique(),
+  creditBalanceUSD: doublePrecision("credit_balance_usd").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertX402UsersSchema = createInsertSchema(x402Users).omit({ id: true, createdAt: true });
+export type InsertX402User = z.infer<typeof insertX402UsersSchema>;
+export type X402User = typeof x402Users.$inferSelect;
+
+// x402 Credit Transactions Table (Database) - Track credit top-ups (ZEKTA token or crypto)
+export const x402CreditTransactions = pgTable("x402_credit_transactions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  amountUSD: doublePrecision("amount_usd").notNull(),
+  paymentMethod: varchar("payment_method", { length: 20 }).notNull(), // 'ZEKTA' or 'CRYPTO'
+  currency: varchar("currency", { length: 10 }), // 'SOL', 'ETH', 'BTC', etc (null if ZEKTA)
+  amountCrypto: doublePrecision("amount_crypto"), // null if ZEKTA token
+  amountZekta: doublePrecision("amount_zekta"), // null if crypto
+  txHash: varchar("tx_hash", { length: 255 }),
+  status: varchar("status", { length: 20 }).notNull().default('pending'), // 'pending', 'completed', 'failed'
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertX402CreditTransactionsSchema = createInsertSchema(x402CreditTransactions).omit({ id: true, createdAt: true });
+export type InsertX402CreditTransaction = z.infer<typeof insertX402CreditTransactionsSchema>;
+export type X402CreditTransaction = typeof x402CreditTransactions.$inferSelect;
+
 // x402 Services Table (Database) - Catalog of available x402-compatible services
 export const x402Services = pgTable("x402_services", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
   description: varchar("description", { length: 500 }).notNull(),
   category: varchar("category", { length: 50 }).notNull(), // 'AI', 'Data', 'Web3', 'Infrastructure'
+  provider: varchar("provider", { length: 100 }), // 'OpenAI', 'Anthropic', etc
   priceUSD: doublePrecision("price_usd").notNull(),
   x402Endpoint: varchar("x402_endpoint", { length: 500 }).notNull(),
   logoUrl: varchar("logo_url", { length: 500 }),
@@ -324,19 +356,17 @@ export const insertX402ServicesSchema = createInsertSchema(x402Services).omit({ 
 export type InsertX402Service = z.infer<typeof insertX402ServicesSchema>;
 export type X402Service = typeof x402Services.$inferSelect;
 
-// x402 Purchases Table (Database) - Track user purchases of x402 services
+// x402 Purchases Table (Database) - Track user purchases of x402 services with credits
 export const x402Purchases = pgTable("x402_purchases", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
   serviceId: integer("service_id").notNull(),
-  zkCommitment: varchar("zk_commitment", { length: 255 }),
-  walletAddress: varchar("wallet_address", { length: 255 }),
-  paymentCurrency: varchar("payment_currency", { length: 10 }).notNull(),
-  amountCrypto: doublePrecision("amount_crypto").notNull(),
   amountUSD: doublePrecision("amount_usd").notNull(),
-  exchangeId: varchar("exchange_id", { length: 100 }),
-  paymentStatus: varchar("payment_status", { length: 20 }).notNull().default('pending'),
-  txHash: varchar("tx_hash", { length: 255 }),
-  x402Response: varchar("x402_response", { length: 5000 }),
+  status: varchar("status", { length: 20 }).notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
+  x402TxHash: varchar("x402_tx_hash", { length: 255 }), // x402 protocol transaction hash
+  apiKey: varchar("api_key", { length: 500 }), // Service API key returned
+  accessToken: varchar("access_token", { length: 500 }), // Service access token
+  expiresAt: timestamp("expires_at"),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -344,3 +374,17 @@ export const x402Purchases = pgTable("x402_purchases", {
 export const insertX402PurchasesSchema = createInsertSchema(x402Purchases).omit({ id: true, createdAt: true });
 export type InsertX402Purchase = z.infer<typeof insertX402PurchasesSchema>;
 export type X402Purchase = typeof x402Purchases.$inferSelect;
+
+// x402 Purchase Logs Table (Database) - Detailed logging for purchase process
+export const x402PurchaseLogs = pgTable("x402_purchase_logs", {
+  id: serial("id").primaryKey(),
+  purchaseId: integer("purchase_id").notNull(),
+  logType: varchar("log_type", { length: 20 }).notNull(), // 'info', 'error', 'warning'
+  message: varchar("message", { length: 1000 }).notNull(),
+  metadata: varchar("metadata", { length: 5000 }), // JSON string for additional data
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertX402PurchaseLogsSchema = createInsertSchema(x402PurchaseLogs).omit({ id: true, createdAt: true });
+export type InsertX402PurchaseLog = z.infer<typeof insertX402PurchaseLogsSchema>;
+export type X402PurchaseLog = typeof x402PurchaseLogs.$inferSelect;

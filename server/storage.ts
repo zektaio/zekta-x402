@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { protocolStats, dailyRevenue, uniqueWallets, developers, apiKeys, paymentRequests, domainOrders, giftCardOrders, loyalHolders, x402Services, type ProtocolStats as DBProtocolStats, type DailyRevenue as DBDailyRevenue } from "@shared/schema";
+import { protocolStats, dailyRevenue, uniqueWallets, developers, apiKeys, paymentRequests, domainOrders, giftCardOrders, loyalHolders, x402Services, x402Users, x402CreditTransactions, x402Purchases, x402PurchaseLogs, type ProtocolStats as DBProtocolStats, type DailyRevenue as DBDailyRevenue } from "@shared/schema";
 import { eq, sql, count, and, or, isNotNull } from "drizzle-orm";
 
 export interface Deposit {
@@ -126,6 +126,27 @@ export interface IStorage {
   // x402 Services Management
   getAllX402Services(): Promise<any[]>;
   getX402Service(id: number): Promise<any | undefined>;
+  createX402Service(name: string, description: string, category: string, provider: string | null, priceUSD: number, x402Endpoint: string, logoUrl: string | null): Promise<{ id: number }>;
+  
+  // x402 Users Management (zkID authentication)
+  createX402User(zkCommitment: string): Promise<{ id: number }>;
+  getX402UserByCommitment(zkCommitment: string): Promise<{ id: number; zkCommitment: string; creditBalanceUSD: number; createdAt: Date } | undefined>;
+  updateX402UserBalance(userId: number, newBalance: number): Promise<void>;
+  
+  // x402 Credit Transactions Management
+  createX402CreditTransaction(userId: number, amountUSD: number, paymentMethod: string, currency: string | null, amountCrypto: number | null, amountZekta: number | null): Promise<{ id: number }>;
+  getX402CreditTransactions(userId: number): Promise<any[]>;
+  updateX402CreditStatus(transactionId: number, status: string, txHash?: string): Promise<void>;
+  
+  // x402 Purchases Management
+  createX402Purchase(userId: number, serviceId: number, amountUSD: number): Promise<{ id: number }>;
+  getX402Purchase(id: number): Promise<any | undefined>;
+  getX402PurchasesByUser(userId: number): Promise<any[]>;
+  updateX402PurchaseStatus(purchaseId: number, status: string, x402TxHash?: string, apiKey?: string, accessToken?: string): Promise<void>;
+  
+  // x402 Purchase Logs Management
+  createX402PurchaseLog(purchaseId: number, logType: string, message: string, metadata?: string): Promise<{ id: number }>;
+  getX402PurchaseLogs(purchaseId: number): Promise<any[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -422,6 +443,58 @@ export class MemStorage implements IStorage {
 
   async getX402Service(id: number): Promise<any | undefined> {
     throw new Error("x402 Services not supported in MemStorage - use DBStorage");
+  }
+
+  async createX402Service(name: string, description: string, category: string, provider: string | null, priceUSD: number, x402Endpoint: string, logoUrl: string | null): Promise<{ id: number }> {
+    throw new Error("x402 Services not supported in MemStorage - use DBStorage");
+  }
+
+  async createX402User(zkCommitment: string): Promise<{ id: number }> {
+    throw new Error("x402 Users not supported in MemStorage - use DBStorage");
+  }
+
+  async getX402UserByCommitment(zkCommitment: string): Promise<{ id: number; zkCommitment: string; creditBalanceUSD: number; createdAt: Date } | undefined> {
+    throw new Error("x402 Users not supported in MemStorage - use DBStorage");
+  }
+
+  async updateX402UserBalance(userId: number, newBalance: number): Promise<void> {
+    throw new Error("x402 Users not supported in MemStorage - use DBStorage");
+  }
+
+  async createX402CreditTransaction(userId: number, amountUSD: number, paymentMethod: string, currency: string | null, amountCrypto: number | null, amountZekta: number | null): Promise<{ id: number }> {
+    throw new Error("x402 Credit Transactions not supported in MemStorage - use DBStorage");
+  }
+
+  async getX402CreditTransactions(userId: number): Promise<any[]> {
+    throw new Error("x402 Credit Transactions not supported in MemStorage - use DBStorage");
+  }
+
+  async updateX402CreditStatus(transactionId: number, status: string, txHash?: string): Promise<void> {
+    throw new Error("x402 Credit Transactions not supported in MemStorage - use DBStorage");
+  }
+
+  async createX402Purchase(userId: number, serviceId: number, amountUSD: number): Promise<{ id: number }> {
+    throw new Error("x402 Purchases not supported in MemStorage - use DBStorage");
+  }
+
+  async getX402Purchase(id: number): Promise<any | undefined> {
+    throw new Error("x402 Purchases not supported in MemStorage - use DBStorage");
+  }
+
+  async getX402PurchasesByUser(userId: number): Promise<any[]> {
+    throw new Error("x402 Purchases not supported in MemStorage - use DBStorage");
+  }
+
+  async updateX402PurchaseStatus(purchaseId: number, status: string, x402TxHash?: string, apiKey?: string, accessToken?: string): Promise<void> {
+    throw new Error("x402 Purchases not supported in MemStorage - use DBStorage");
+  }
+
+  async createX402PurchaseLog(purchaseId: number, logType: string, message: string, metadata?: string): Promise<{ id: number }> {
+    throw new Error("x402 Purchase Logs not supported in MemStorage - use DBStorage");
+  }
+
+  async getX402PurchaseLogs(purchaseId: number): Promise<any[]> {
+    throw new Error("x402 Purchase Logs not supported in MemStorage - use DBStorage");
   }
 
 }
@@ -1217,6 +1290,123 @@ export class DBStorage implements IStorage {
   async getX402Service(id: number): Promise<any | undefined> {
     const service = await db.select().from(x402Services).where(eq(x402Services.id, id)).limit(1);
     return service[0];
+  }
+
+  async createX402Service(name: string, description: string, category: string, provider: string | null, priceUSD: number, x402Endpoint: string, logoUrl: string | null): Promise<{ id: number }> {
+    const result = await db.insert(x402Services).values({
+      name,
+      description,
+      category,
+      provider,
+      priceUSD,
+      x402Endpoint,
+      logoUrl,
+      isActive: true
+    }).returning({ id: x402Services.id });
+    return result[0];
+  }
+
+  async createX402User(zkCommitment: string): Promise<{ id: number }> {
+    const result = await db.insert(x402Users).values({
+      zkCommitment,
+      creditBalanceUSD: 0
+    }).returning({ id: x402Users.id });
+    return result[0];
+  }
+
+  async getX402UserByCommitment(zkCommitment: string): Promise<{ id: number; zkCommitment: string; creditBalanceUSD: number; createdAt: Date } | undefined> {
+    const result = await db.select().from(x402Users).where(eq(x402Users.zkCommitment, zkCommitment)).limit(1);
+    return result[0];
+  }
+
+  async updateX402UserBalance(userId: number, newBalance: number): Promise<void> {
+    await db.update(x402Users)
+      .set({ creditBalanceUSD: newBalance })
+      .where(eq(x402Users.id, userId));
+  }
+
+  async createX402CreditTransaction(userId: number, amountUSD: number, paymentMethod: string, currency: string | null, amountCrypto: number | null, amountZekta: number | null): Promise<{ id: number }> {
+    const result = await db.insert(x402CreditTransactions).values({
+      userId,
+      amountUSD,
+      paymentMethod,
+      currency,
+      amountCrypto,
+      amountZekta,
+      status: 'pending'
+    }).returning({ id: x402CreditTransactions.id });
+    return result[0];
+  }
+
+  async getX402CreditTransactions(userId: number): Promise<any[]> {
+    const transactions = await db.select()
+      .from(x402CreditTransactions)
+      .where(eq(x402CreditTransactions.userId, userId))
+      .orderBy(sql`${x402CreditTransactions.createdAt} DESC`);
+    return transactions;
+  }
+
+  async updateX402CreditStatus(transactionId: number, status: string, txHash?: string): Promise<void> {
+    await db.update(x402CreditTransactions)
+      .set({
+        status,
+        txHash: txHash || sql`${x402CreditTransactions.txHash}`,
+        completedAt: status === 'completed' ? new Date() : sql`${x402CreditTransactions.completedAt}`
+      })
+      .where(eq(x402CreditTransactions.id, transactionId));
+  }
+
+  async createX402Purchase(userId: number, serviceId: number, amountUSD: number): Promise<{ id: number }> {
+    const result = await db.insert(x402Purchases).values({
+      userId,
+      serviceId,
+      amountUSD,
+      status: 'pending'
+    }).returning({ id: x402Purchases.id });
+    return result[0];
+  }
+
+  async getX402Purchase(id: number): Promise<any | undefined> {
+    const result = await db.select().from(x402Purchases).where(eq(x402Purchases.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getX402PurchasesByUser(userId: number): Promise<any[]> {
+    const purchases = await db.select()
+      .from(x402Purchases)
+      .where(eq(x402Purchases.userId, userId))
+      .orderBy(sql`${x402Purchases.createdAt} DESC`);
+    return purchases;
+  }
+
+  async updateX402PurchaseStatus(purchaseId: number, status: string, x402TxHash?: string, apiKey?: string, accessToken?: string): Promise<void> {
+    await db.update(x402Purchases)
+      .set({
+        status,
+        x402TxHash: x402TxHash || sql`${x402Purchases.x402TxHash}`,
+        apiKey: apiKey || sql`${x402Purchases.apiKey}`,
+        accessToken: accessToken || sql`${x402Purchases.accessToken}`,
+        completedAt: status === 'completed' ? new Date() : sql`${x402Purchases.completedAt}`
+      })
+      .where(eq(x402Purchases.id, purchaseId));
+  }
+
+  async createX402PurchaseLog(purchaseId: number, logType: string, message: string, metadata?: string): Promise<{ id: number }> {
+    const result = await db.insert(x402PurchaseLogs).values({
+      purchaseId,
+      logType,
+      message,
+      metadata
+    }).returning({ id: x402PurchaseLogs.id });
+    return result[0];
+  }
+
+  async getX402PurchaseLogs(purchaseId: number): Promise<any[]> {
+    const logs = await db.select()
+      .from(x402PurchaseLogs)
+      .where(eq(x402PurchaseLogs.purchaseId, purchaseId))
+      .orderBy(sql`${x402PurchaseLogs.createdAt} ASC`);
+    return logs;
   }
 
 }
