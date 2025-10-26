@@ -1009,7 +1009,7 @@ export default function Docs() {
                     <ul className="space-y-2">
                       <li className="flex items-start gap-2 text-cyan-800">
                         <CheckCircle2 className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                        <span><strong>Marketplace Exposure:</strong> Listed on Zekta + x402index.com</span>
+                        <span><strong>Marketplace Exposure:</strong> Listed on Zekta + x402 Bazaar (Official Coinbase)</span>
                       </li>
                       <li className="flex items-start gap-2 text-cyan-800">
                         <CheckCircle2 className="h-5 w-5 flex-shrink-0 mt-0.5" />
@@ -1281,7 +1281,7 @@ app.listen(3000);`}
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-5 w-5 flex-shrink-0 mt-0.5 text-green-600" />
-                    <span><strong>Register on x402index.com:</strong> Get your service listed for discovery</span>
+                    <span><strong>Register on x402 Bazaar:</strong> Get your service listed for discovery via Coinbase CDP</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="h-5 w-5 flex-shrink-0 mt-0.5 text-green-600" />
@@ -1296,8 +1296,8 @@ app.listen(3000);`}
 
               <div className="flex gap-3">
                 <Button asChild className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700">
-                  <a href="https://x402index.com" target="_blank" rel="noopener noreferrer">
-                    Submit Your Service
+                  <a href="https://docs.cdp.coinbase.com/x402/bazaar" target="_blank" rel="noopener noreferrer">
+                    Submit to x402 Bazaar
                   </a>
                 </Button>
                 <Button asChild variant="outline" className="gap-2">
@@ -1542,11 +1542,11 @@ app.listen(3000);`}
                 <h4 className="font-semibold text-gray-900 mb-3">💡 Service Discovery</h4>
                 <p className="text-sm text-gray-700 mb-3">
                   New x402-compatible services are added regularly. The marketplace automatically discovers services 
-                  from x402index.com and displays them sorted by popularity.
+                  from x402 Bazaar (Official Coinbase API) and displays them sorted by popularity.
                 </p>
                 <p className="text-sm text-gray-700">
-                  Can't find a service? Services are pulled from the x402 protocol registry. Any x402-compatible 
-                  service can be accessed through Zekta's marketplace.
+                  Can't find a service? Services are pulled from the official x402 protocol registry at bazaar.x402.org. 
+                  Any x402-compatible service registered with Coinbase CDP can be accessed through Zekta's marketplace.
                 </p>
               </div>
             </div>

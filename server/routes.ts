@@ -2994,17 +2994,18 @@ export async function registerRoutes(app: Express, swapClient: SimpleSwapClient 
   // x402 Marketplace Routes
   app.get("/api/x402/services", async (req, res) => {
     try {
-      // Fetch real services from x402index.com
-      const response = await fetch('https://www.x402index.com/api/all');
+      // Fetch real services from OFFICIAL Coinbase x402 Bazaar
+      const response = await fetch('https://bazaar.x402.org/list');
       
       if (!response.ok) {
-        throw new Error(`x402index.com API returned ${response.status}`);
+        throw new Error(`x402 Bazaar API returned ${response.status}`);
       }
       
-      const x402Services = await response.json();
+      const bazaarData = await response.json();
+      const x402Services = bazaarData.services || bazaarData;
       
       // Log response shape for debugging
-      console.log(`✅ Fetched ${x402Services.length} services from x402index.com`);
+      console.log(`✅ Fetched ${x402Services.length} services from x402 Bazaar (Official Coinbase API)`);
       if (x402Services.length > 0) {
         console.log('Sample service structure:', JSON.stringify(x402Services[0], null, 2).substring(0, 500));
       }
@@ -3012,13 +3013,13 @@ export async function registerRoutes(app: Express, swapClient: SimpleSwapClient 
       // Transform to our frontend format
       let services = x402Services.map((service: any, index: number) => ({
         id: index + 1,
-        name: service.name || 'Unnamed Service',
+        name: service.name || service.description?.split(':')[0] || 'Unnamed Service',
         description: service.description || 'No description available',
-        category: categorizeService(service.name, service.description),
-        priceUSD: extractPrice(service),
-        x402Endpoint: service.url || service.endpoint || '',
+        category: categorizeService(service.name || service.description, service.capabilities?.join(', ') || ''),
+        priceUSD: parseFloat(service.price?.replace('$', '') || service.accepts?.price || '0.001'),
+        x402Endpoint: service.endpoint || service.url || '',
         logoUrl: service.logo_url || null,
-        isActive: true,
+        isActive: service.discoverable !== false,
       }));
       
       // Sort by popularity (popular services first)
@@ -3027,7 +3028,7 @@ export async function registerRoutes(app: Express, swapClient: SimpleSwapClient 
       res.json({ ok: true, services });
     } catch (error: any) {
       console.error("❌ Failed to fetch x402 services:", error);
-      // Fallback to database if x402index.com is down
+      // Fallback to database if Bazaar API is down
       try {
         let fallbackServices = await storage.getAllX402Services();
         // Sort fallback services by popularity too
