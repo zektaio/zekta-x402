@@ -1,12 +1,20 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Sparkles, Database, Globe, Cpu, ExternalLink } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Search, Sparkles, Database, Globe, Cpu, Wallet, User, LogIn, DollarSign, History, ExternalLink, Copy, Check } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { useQuery } from '@tanstack/react-query';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import { Identity } from '@semaphore-protocol/identity';
 
 interface X402Service {
   id: number;
@@ -17,6 +25,13 @@ interface X402Service {
   x402Endpoint: string;
   logoUrl: string | null;
   isActive: boolean;
+}
+
+interface X402User {
+  id: number;
+  zkCommitment: string;
+  creditBalanceUSD: number;
+  createdAt: Date;
 }
 
 const CATEGORY_ICONS: Record<string, any> = {
@@ -34,8 +49,16 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function X402Marketplace() {
+  const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentUser, setCurrentUser] = useState<X402User | null>(null);
+  const [zkCommitment, setZkCommitment] = useState('');
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [showTopUpDialog, setShowTopUpDialog] = useState(false);
+  const [showPurchaseDialog, setShowPurchaseDialog] = useState(false);
+  const [selectedService, setSelectedService] = useState<X402Service | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const { data: servicesResponse, isLoading } = useQuery<{ ok: boolean; services: X402Service[] }>({
     queryKey: ['/api/x402/services'],
@@ -51,10 +74,324 @@ export default function X402Marketplace() {
     return matchesCategory && matchesSearch && service.isActive;
   });
 
+  // Generate new zkID
+  const generateZkId = () => {
+    const identity = new Identity();
+    const commitment = identity.commitment.toString();
+    setZkCommitment(commitment);
+    
+    // Save identity to localStorage for later use (simplified - just store commitment)
+    const identityData = {
+      commitment: commitment,
+      created: new Date().toISOString()
+    };
+    localStorage.setItem('zkIdentity', JSON.stringify(identityData));
+    
+    toast({
+      title: "zkID Generated",
+      description: "Your anonymous identity has been created. Save it securely!",
+    });
+  };
+
+  // Load existing zkID
+  const loadZkId = () => {
+    const stored = localStorage.getItem('zkIdentity');
+    if (stored) {
+      const identity = JSON.parse(stored);
+      setZkCommitment(identity.commitment);
+      toast({
+        title: "zkID Loaded",
+        description: "Your identity has been loaded from local storage",
+      });
+    } else {
+      toast({
+        title: "No zkID Found",
+        description: "Generate a new zkID to get started",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Copy commitment
+  const copyCommitment = () => {
+    navigator.clipboard.writeText(zkCommitment);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast({
+      title: "Copied!",
+      description: "zkID commitment copied to clipboard",
+    });
+  };
+
+  // Register mutation
+  const registerMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('POST', '/api/x402/auth/register', {
+        zkCommitment
+      });
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Registration Successful",
+        description: "Your zkID has been registered on-chain",
+      });
+      loginMutation.mutate();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Registration Failed",
+        description: error.message || "Failed to register zkID",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Login mutation
+  const loginMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('POST', '/api/x402/auth/login', {
+        zkCommitment
+      });
+    },
+    onSuccess: (data: any) => {
+      setCurrentUser(data.user);
+      setShowAuthDialog(false);
+      toast({
+        title: "Login Successful",
+        description: `Welcome! Balance: $${data.user.creditBalanceUSD.toFixed(2)}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Login Failed", 
+        description: error.message || "User not found. Please register first.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Top-up mutation
+  const topUpMutation = useMutation({
+    mutationFn: async (amount: number) => {
+      return apiRequest('POST', '/api/x402/credits/topup', {
+        zkCommitment: currentUser?.zkCommitment,
+        amountUSD: amount,
+        paymentMethod: 'crypto',
+        currency: 'SOL',
+        amountCrypto: amount / 100 // Mock conversion
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Top-Up Initiated",
+        description: "Payment processing. Credits will be added shortly.",
+      });
+      setShowTopUpDialog(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/x402/auth/me'] });
+    }
+  });
+
+  // Purchase mutation
+  const purchaseMutation = useMutation({
+    mutationFn: async (serviceId: number) => {
+      return apiRequest('POST', `/api/x402/purchase/${serviceId}`, {
+        zkCommitment: currentUser?.zkCommitment
+      });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Purchase Successful!",
+        description: `${data.service.name} access granted. New balance: $${data.newBalance.toFixed(2)}`,
+      });
+      setShowPurchaseDialog(false);
+      setCurrentUser(prev => prev ? { ...prev, creditBalanceUSD: data.newBalance } : null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Purchase Failed",
+        description: error.message || "Insufficient credits or service unavailable",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handlePurchase = (service: X402Service) => {
+    if (!currentUser) {
+      setShowAuthDialog(true);
+      toast({
+        title: "Login Required",
+        description: "Please login with your zkID to purchase services",
+      });
+      return;
+    }
+
+    setSelectedService(service);
+    setShowPurchaseDialog(true);
+  };
+
   return (
     <div className="relative min-h-screen">
       <section className="relative py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
+          {/* Top Bar - zkID & Credits */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="mb-8"
+          >
+            <Card className="bg-card/50 backdrop-blur">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/50">
+                      <User className="w-3 h-3 mr-1 flex-shrink-0" />
+                      zkID
+                    </Badge>
+                    {currentUser ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          {currentUser.zkCommitment.slice(0, 10)}...{currentUser.zkCommitment.slice(-8)}
+                        </span>
+                        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/50">
+                          Connected
+                        </Badge>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Not connected</span>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    {currentUser && (
+                      <div className="flex items-center gap-2">
+                        <Wallet className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="font-semibold gradient-text text-lg">
+                          ${currentUser.creditBalanceUSD.toFixed(2)}
+                        </span>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => setShowTopUpDialog(true)}
+                          data-testid="button-topup"
+                        >
+                          <DollarSign className="w-3 h-3 mr-1 flex-shrink-0" />
+                          Top Up
+                        </Button>
+                      </div>
+                    )}
+                    
+                    <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
+                      <DialogTrigger asChild>
+                        <Button variant="default" data-testid="button-login">
+                          <LogIn className="w-4 h-4 mr-2 flex-shrink-0" />
+                          {currentUser ? 'Switch zkID' : 'Login / Register'}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-lg" data-testid="dialog-auth">
+                        <DialogHeader>
+                          <DialogTitle>zkID Authentication</DialogTitle>
+                          <DialogDescription>
+                            Create or login with your anonymous Semaphore identity
+                          </DialogDescription>
+                        </DialogHeader>
+                        
+                        <Tabs defaultValue="login" className="w-full">
+                          <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="login">Login</TabsTrigger>
+                            <TabsTrigger value="register">Register</TabsTrigger>
+                          </TabsList>
+                          
+                          <TabsContent value="login" className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>zkID Commitment</Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  placeholder="Enter your zkID commitment..."
+                                  value={zkCommitment}
+                                  onChange={(e) => setZkCommitment(e.target.value)}
+                                  data-testid="input-commitment"
+                                />
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={loadZkId}
+                                  data-testid="button-load-zkid"
+                                >
+                                  Load
+                                </Button>
+                              </div>
+                            </div>
+                            <Button 
+                              className="w-full" 
+                              onClick={() => loginMutation.mutate()}
+                              disabled={!zkCommitment || loginMutation.isPending}
+                              data-testid="button-login-submit"
+                            >
+                              {loginMutation.isPending ? 'Logging in...' : 'Login'}
+                            </Button>
+                          </TabsContent>
+                          
+                          <TabsContent value="register" className="space-y-4">
+                            <div className="space-y-4">
+                              <div className="flex gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  className="flex-1"
+                                  onClick={generateZkId}
+                                  data-testid="button-generate-zkid"
+                                >
+                                  <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
+                                  Generate New zkID
+                                </Button>
+                                <Button 
+                                  variant="outline"
+                                  onClick={loadZkId}
+                                  data-testid="button-load-existing"
+                                >
+                                  Load Existing
+                                </Button>
+                              </div>
+                              
+                              {zkCommitment && (
+                                <div className="p-4 bg-muted rounded-md space-y-2">
+                                  <Label className="text-xs text-muted-foreground">Your zkID Commitment:</Label>
+                                  <div className="flex items-center gap-2">
+                                    <code className="flex-1 text-xs break-all">{zkCommitment}</code>
+                                    <Button 
+                                      size="icon" 
+                                      variant="ghost"
+                                      onClick={copyCommitment}
+                                      data-testid="button-copy-commitment"
+                                    >
+                                      {copied ? <Check className="w-4 h-4 flex-shrink-0" /> : <Copy className="w-4 h-4 flex-shrink-0" />}
+                                    </Button>
+                                  </div>
+                                  <p className="text-xs text-orange-400">
+                                    ⚠️ Save this securely! It's stored in your browser but back it up.
+                                  </p>
+                                </div>
+                              )}
+                              
+                              <Button 
+                                className="w-full"
+                                onClick={() => registerMutation.mutate()}
+                                disabled={!zkCommitment || registerMutation.isPending}
+                                data-testid="button-register-submit"
+                              >
+                                {registerMutation.isPending ? 'Registering...' : 'Register zkID'}
+                              </Button>
+                            </div>
+                          </TabsContent>
+                        </Tabs>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
           {/* Hero Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -93,7 +430,7 @@ export default function X402Marketplace() {
           >
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground flex-shrink-0" />
                 <Input
                   placeholder="Search services..."
                   value={searchQuery}
@@ -172,10 +509,14 @@ export default function X402Marketplace() {
                       <CardContent className="flex-1 flex flex-col justify-end">
                         <Button
                           className="w-full"
+                          onClick={() => handlePurchase(service)}
+                          disabled={!!(currentUser && currentUser.creditBalanceUSD < service.priceUSD)}
                           data-testid={`button-purchase-${service.id}`}
                         >
                           <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
-                          Purchase Access
+                          {currentUser && currentUser.creditBalanceUSD < service.priceUSD 
+                            ? 'Insufficient Credits' 
+                            : 'Purchase Access'}
                         </Button>
                       </CardContent>
                     </Card>
@@ -184,6 +525,89 @@ export default function X402Marketplace() {
               })}
             </motion.div>
           )}
+
+          {/* Purchase Confirmation Dialog */}
+          <Dialog open={showPurchaseDialog} onOpenChange={setShowPurchaseDialog}>
+            <DialogContent data-testid="dialog-purchase">
+              <DialogHeader>
+                <DialogTitle>Confirm Purchase</DialogTitle>
+                <DialogDescription>
+                  Review your purchase details
+                </DialogDescription>
+              </DialogHeader>
+              
+              {selectedService && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-muted rounded-md space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Service:</span>
+                      <span className="font-semibold">{selectedService.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Price:</span>
+                      <span className="font-semibold gradient-text">${selectedService.priceUSD.toFixed(3)}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Current Balance:</span>
+                      <span className="font-semibold">${currentUser?.creditBalanceUSD.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">After Purchase:</span>
+                      <span className="font-semibold text-emerald-400">
+                        ${((currentUser?.creditBalanceUSD || 0) - selectedService.priceUSD).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    className="w-full" 
+                    onClick={() => purchaseMutation.mutate(selectedService.id)}
+                    disabled={purchaseMutation.isPending}
+                    data-testid="button-confirm-purchase"
+                  >
+                    {purchaseMutation.isPending ? 'Processing...' : 'Confirm Purchase'}
+                  </Button>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Top-Up Dialog */}
+          <Dialog open={showTopUpDialog} onOpenChange={setShowTopUpDialog}>
+            <DialogContent data-testid="dialog-topup">
+              <DialogHeader>
+                <DialogTitle>Top-Up Credits</DialogTitle>
+                <DialogDescription>
+                  Add credits to your account using $ZEKTA or any supported cryptocurrency
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {[10, 25, 50, 100].map(amount => (
+                    <Button
+                      key={amount}
+                      variant="outline"
+                      onClick={() => topUpMutation.mutate(amount)}
+                      disabled={topUpMutation.isPending}
+                      data-testid={`button-topup-${amount}`}
+                    >
+                      ${amount}
+                    </Button>
+                  ))}
+                </div>
+                
+                <div className="p-4 bg-muted rounded-md text-sm text-muted-foreground">
+                  <p>💡 Credits can be purchased with:</p>
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>$ZEKTA token (direct payment)</li>
+                    <li>SOL, BTC, ETH, USDC (via zkSwap)</li>
+                  </ul>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Info Section */}
           <motion.div
@@ -204,36 +628,36 @@ export default function X402Marketplace() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/50">1</Badge>
-                      <h3 className="font-semibold">Choose Service</h3>
+                      <h3 className="font-semibold">Create zkID</h3>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Browse AI, data, and Web3 services from the x402 ecosystem
+                      Generate your anonymous Semaphore identity for privacy-first authentication
                     </p>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/50">2</Badge>
-                      <h3 className="font-semibold">Pay with ZEKTA</h3>
+                      <h3 className="font-semibold">Top-Up Credits</h3>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Pay using $ZEKTA token or any supported cryptocurrency
+                      Add credits using $ZEKTA token or any supported cryptocurrency via zkSwap
                     </p>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/50">3</Badge>
-                      <h3 className="font-semibold">Instant Access</h3>
+                      <h3 className="font-semibold">Purchase Services</h3>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Get immediate access to the service via x402 protocol
+                      Buy AI, data, and Web3 services instantly with your credits
                     </p>
                   </div>
                 </div>
 
                 <div className="pt-4 border-t border-border">
                   <p className="text-sm text-muted-foreground">
-                    All payments are converted to USDC on Base via Zekta's anonymous zkSwap protocol, then forwarded to the x402 service provider. 
-                    No accounts, no API keys required. Instant settlement in 2 seconds.
+                    All transactions are processed via x402 protocol on Base. Your zkID keeps you anonymous while enabling seamless service access. 
+                    Payments are converted to USDC automatically. No KYC, no accounts, just pure decentralized access.
                   </p>
                 </div>
               </CardContent>
