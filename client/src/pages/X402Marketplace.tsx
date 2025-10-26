@@ -70,12 +70,11 @@ export default function X402Marketplace() {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentUser, setCurrentUser] = useState<X402User | null>(null);
-  const [zkCommitment, setZkCommitment] = useState('');
+  const [zkIdentity, setZkIdentity] = useState<any>(null);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [showTopUpDialog, setShowTopUpDialog] = useState(false);
   const [showPurchaseDialog, setShowPurchaseDialog] = useState(false);
   const [selectedService, setSelectedService] = useState<X402Service | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const { data: servicesResponse, isLoading } = useQuery<{ ok: boolean; services: X402Service[] }>({
     queryKey: ['/api/x402/services'],
@@ -103,60 +102,107 @@ export default function X402Marketplace() {
     return matchesCategory && matchesSearch && service.isActive;
   });
 
-  // Generate new zkID
+  // Generate new zkID and auto-download backup file
   const generateZkId = () => {
     const identity = new Identity();
     const commitment = identity.commitment.toString();
-    setZkCommitment(commitment);
     
-    // Save identity to localStorage for later use (simplified - just store commitment)
-    const identityData = {
+    // @ts-ignore - trapdoor and nullifier exist but are private in TypeScript
+    const zkData = {
+      trapdoor: identity.trapdoor.toString(),
+      nullifier: identity.nullifier.toString(),
       commitment: commitment,
-      created: new Date().toISOString()
+      createdAt: new Date().toISOString()
     };
-    localStorage.setItem('zkIdentity', JSON.stringify(identityData));
+    
+    // Save to localStorage as backup
+    localStorage.setItem('zkIdentity', JSON.stringify(zkData));
+    setZkIdentity(zkData);
+    
+    // Auto-download backup file
+    const blob = new Blob([JSON.stringify(zkData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `zkid-backup-${commitment.slice(0, 8)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     
     toast({
-      title: "zkID Generated",
-      description: "Your anonymous identity has been created. Save it securely!",
+      title: "zkID Generated & Downloaded",
+      description: "⚠️ Keep this file safe - it's your ONLY way to access your account!",
     });
   };
 
-  // Load existing zkID
-  const loadZkId = () => {
-    const stored = localStorage.getItem('zkIdentity');
-    if (stored) {
-      const identity = JSON.parse(stored);
-      setZkCommitment(identity.commitment);
-      toast({
-        title: "zkID Loaded",
-        description: "Your identity has been loaded from local storage",
-      });
-    } else {
-      toast({
-        title: "No zkID Found",
-        description: "Generate a new zkID to get started",
-        variant: "destructive"
-      });
-    }
+  // Upload zkID backup file
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const zkData = JSON.parse(e.target?.result as string);
+        
+        // Validate zkID structure
+        if (!zkData.trapdoor || !zkData.nullifier || !zkData.commitment) {
+          throw new Error('Invalid zkID file format');
+        }
+        
+        // Save to localStorage
+        localStorage.setItem('zkIdentity', JSON.stringify(zkData));
+        setZkIdentity(zkData);
+        
+        toast({
+          title: "zkID Loaded",
+          description: "Your identity has been restored from backup file",
+        });
+      } catch (error) {
+        toast({
+          title: "Invalid File",
+          description: "Please upload a valid zkID backup file (.json)",
+          variant: "destructive"
+        });
+      }
+    };
+    reader.readAsText(file);
   };
 
-  // Copy commitment
-  const copyCommitment = () => {
-    navigator.clipboard.writeText(zkCommitment);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  // Download current zkID backup
+  const downloadZkIdBackup = () => {
+    if (!zkIdentity) {
+      toast({
+        title: "No zkID",
+        description: "Generate or upload a zkID first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const blob = new Blob([JSON.stringify(zkIdentity, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `zkid-backup-${zkIdentity.commitment.slice(0, 8)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
     toast({
-      title: "Copied!",
-      description: "zkID commitment copied to clipboard",
+      title: "Backup Downloaded",
+      description: "zkID backup file saved successfully",
     });
   };
 
   // Register mutation
   const registerMutation = useMutation({
     mutationFn: async () => {
+      if (!zkIdentity) throw new Error('No zkID loaded');
       const res = await apiRequest('POST', '/api/x402/auth/register', {
-        zkCommitment
+        zkCommitment: zkIdentity.commitment
       });
       return res.json();
     },
@@ -179,8 +225,9 @@ export default function X402Marketplace() {
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: async () => {
+      if (!zkIdentity) throw new Error('No zkID loaded');
       const res = await apiRequest('POST', '/api/x402/auth/login', {
-        zkCommitment
+        zkCommitment: zkIdentity.commitment
       });
       return res.json();
     },
@@ -336,85 +383,87 @@ export default function X402Marketplace() {
                           </TabsList>
                           
                           <TabsContent value="login" className="space-y-4">
-                            <div className="space-y-2">
-                              <Label>zkID Commitment</Label>
-                              <div className="flex gap-2">
-                                <Input
-                                  placeholder="Enter your zkID commitment..."
-                                  value={zkCommitment}
-                                  onChange={(e) => setZkCommitment(e.target.value)}
-                                  data-testid="input-commitment"
-                                />
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={loadZkId}
-                                  data-testid="button-load-zkid"
-                                >
-                                  Load
-                                </Button>
-                              </div>
+                            <div className="border-2 border-dashed border-border rounded-md p-6 text-center">
+                              <Input 
+                                type="file" 
+                                accept=".json"
+                                onChange={handleFileUpload}
+                                className="hidden"
+                                id="zkid-upload-login"
+                                data-testid="input-zkid-upload"
+                              />
+                              <label htmlFor="zkid-upload-login" className="cursor-pointer">
+                                <User className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
+                                <p className="font-semibold">Upload zkID Backup File</p>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  Click to select your zkid-backup-*.json file
+                                </p>
+                              </label>
                             </div>
+
+                            {zkIdentity && (
+                              <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-md">
+                                <p className="text-sm font-medium text-emerald-400">✓ zkID Loaded Successfully</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {zkIdentity.commitment.slice(0, 16)}...{zkIdentity.commitment.slice(-8)}
+                                </p>
+                              </div>
+                            )}
+                            
                             <Button 
                               className="w-full" 
                               onClick={() => loginMutation.mutate()}
-                              disabled={!zkCommitment || loginMutation.isPending}
+                              disabled={!zkIdentity || loginMutation.isPending}
                               data-testid="button-login-submit"
                             >
-                              {loginMutation.isPending ? 'Logging in...' : 'Login'}
+                              <LogIn className="w-4 h-4 mr-2 flex-shrink-0" />
+                              {loginMutation.isPending ? 'Logging in...' : 'Login with zkID'}
                             </Button>
                           </TabsContent>
                           
                           <TabsContent value="register" className="space-y-4">
-                            <div className="space-y-4">
-                              <div className="flex gap-2">
-                                <Button 
-                                  variant="outline" 
-                                  className="flex-1"
-                                  onClick={generateZkId}
-                                  data-testid="button-generate-zkid"
-                                >
-                                  <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
-                                  Generate New zkID
-                                </Button>
-                                <Button 
-                                  variant="outline"
-                                  onClick={loadZkId}
-                                  data-testid="button-load-existing"
-                                >
-                                  Load Existing
-                                </Button>
-                              </div>
-                              
-                              {zkCommitment && (
-                                <div className="p-4 bg-muted rounded-md space-y-2">
-                                  <Label className="text-xs text-muted-foreground">Your zkID Commitment:</Label>
-                                  <div className="flex items-center gap-2">
-                                    <code className="flex-1 text-xs break-all">{zkCommitment}</code>
-                                    <Button 
-                                      size="icon" 
-                                      variant="ghost"
-                                      onClick={copyCommitment}
-                                      data-testid="button-copy-commitment"
-                                    >
-                                      {copied ? <Check className="w-4 h-4 flex-shrink-0" /> : <Copy className="w-4 h-4 flex-shrink-0" />}
-                                    </Button>
-                                  </div>
-                                  <p className="text-xs text-orange-400">
-                                    ⚠️ Save this securely! It's stored in your browser but back it up.
+                            <Button 
+                              variant="default" 
+                              className="w-full"
+                              onClick={generateZkId}
+                              data-testid="button-generate-zkid"
+                            >
+                              <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
+                              Generate New zkID
+                            </Button>
+                            
+                            {zkIdentity && (
+                              <div className="space-y-3">
+                                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-md space-y-2">
+                                  <p className="text-sm font-medium text-emerald-400">✓ zkID Generated & Downloaded!</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Commitment: {zkIdentity.commitment.slice(0, 16)}...{zkIdentity.commitment.slice(-8)}
+                                  </p>
+                                  <p className="text-xs text-orange-400 font-semibold">
+                                    ⚠️ IMPORTANT: Your zkid-backup-*.json file has been downloaded. Keep it safe - it's your ONLY way to access your account!
                                   </p>
                                 </div>
-                              )}
-                              
-                              <Button 
-                                className="w-full"
-                                onClick={() => registerMutation.mutate()}
-                                disabled={!zkCommitment || registerMutation.isPending}
-                                data-testid="button-register-submit"
-                              >
-                                {registerMutation.isPending ? 'Registering...' : 'Register zkID'}
-                              </Button>
-                            </div>
+
+                                <Button 
+                                  className="w-full"
+                                  onClick={() => registerMutation.mutate()}
+                                  disabled={registerMutation.isPending}
+                                  data-testid="button-register-submit"
+                                >
+                                  {registerMutation.isPending ? 'Registering...' : 'Register zkID On-Chain'}
+                                </Button>
+
+                                <Button 
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={downloadZkIdBackup}
+                                  data-testid="button-download-backup"
+                                >
+                                  <Copy className="w-4 h-4 mr-2 flex-shrink-0" />
+                                  Download Backup Again
+                                </Button>
+                              </div>
+                            )}
                           </TabsContent>
                         </Tabs>
                       </DialogContent>
