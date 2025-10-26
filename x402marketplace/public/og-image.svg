@@ -1,0 +1,44 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg-gradient)"/>
+  
+  <!-- Grid pattern overlay -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+  </pattern>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  
+  <!-- Shield logo -->
+  <g transform="translate(150, 165)">
+    <path d="M150 0L0 48V192C0 288 60 360 150 384C240 360 300 288 300 192V48L150 0Z" 
+          fill="url(#logo-gradient)" opacity="0.2"/>
+    <path d="M150 0L0 48V192C0 288 60 360 150 384C240 360 300 288 300 192V48L150 0Z" 
+          stroke="url(#logo-gradient)" stroke-width="8" fill="none"/>
+    <g fill="url(#logo-gradient)">
+      <path d="M90 120L150 120L90 180L150 180" stroke="url(#logo-gradient)" stroke-width="12" stroke-linecap="round" fill="none"/>
+      <path d="M170 120L170 180M170 150L210 120M170 150L210 180" stroke="url(#logo-gradient)" stroke-width="12" stroke-linecap="round" fill="none"/>
+    </g>
+  </g>
+  
+  <!-- Text content -->
+  <text x="500" y="280" font-family="system-ui, -apple-system, sans-serif" font-size="96" font-weight="bold" fill="white">
+    ZEKTA
+  </text>
+  <text x="500" y="350" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="500" fill="url(#logo-gradient)">
+    Zero-Knowledge Action Layer
+  </text>
+  <text x="500" y="420" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="400" fill="rgba(255,255,255,0.7)">
+    Private swaps • Anonymous domains • ZK proofs
+  </text>
+</svg>
