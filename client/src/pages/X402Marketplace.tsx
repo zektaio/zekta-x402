@@ -155,9 +155,10 @@ export default function X402Marketplace() {
   // Register mutation
   const registerMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('POST', '/api/x402/auth/register', {
+      const res = await apiRequest('POST', '/api/x402/auth/register', {
         zkCommitment
       });
+      return res.json();
     },
     onSuccess: (data) => {
       toast({
@@ -178,9 +179,10 @@ export default function X402Marketplace() {
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('POST', '/api/x402/auth/login', {
+      const res = await apiRequest('POST', '/api/x402/auth/login', {
         zkCommitment
       });
+      return res.json();
     },
     onSuccess: (data: any) => {
       setCurrentUser(data.user);
@@ -202,13 +204,14 @@ export default function X402Marketplace() {
   // Top-up mutation
   const topUpMutation = useMutation({
     mutationFn: async (amount: number) => {
-      return apiRequest('POST', '/api/x402/credits/topup', {
+      const res = await apiRequest('POST', '/api/x402/credits/topup', {
         zkCommitment: currentUser?.zkCommitment,
         amountUSD: amount,
         paymentMethod: 'crypto',
         currency: 'SOL',
         amountCrypto: amount / 100 // Mock conversion
       });
+      return res.json();
     },
     onSuccess: () => {
       toast({
@@ -223,9 +226,10 @@ export default function X402Marketplace() {
   // Purchase mutation
   const purchaseMutation = useMutation({
     mutationFn: async (serviceId: number) => {
-      return apiRequest('POST', `/api/x402/purchase/${serviceId}`, {
+      const res = await apiRequest('POST', `/api/x402/purchase/${serviceId}`, {
         zkCommitment: currentUser?.zkCommitment
       });
+      return res.json();
     },
     onSuccess: (data: any) => {
       toast({
