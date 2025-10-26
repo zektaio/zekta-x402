@@ -48,6 +48,7 @@ import ReportBug from "@/pages/ReportBug";
 import Bugs from "@/pages/Bugs";
 import BugsAdmin from "@/pages/BugsAdmin";
 import X402Marketplace from "@/pages/X402Marketplace";
+import X402Playground from "@/pages/X402Playground";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -93,6 +94,7 @@ function Router() {
       <Route path="/bugs/admin" component={BugsAdmin} />
       <Route path="/bugs" component={Bugs} />
       <Route path="/x402marketplace" component={X402Marketplace} />
+      <Route path="/x402playground" component={X402Playground} />
       <Route component={NotFound} />
     </Switch>
   );
