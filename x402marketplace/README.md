@@ -1,69 +1,50 @@
 # Zekta x402 Marketplace
 
-Privacy-first marketplace for anonymous access to premium AI, data, and Web3 services using zero-knowledge proofs and x402 protocol.
+Privacy-first marketplace for anonymous access to premium AI, data, and Web3 services using zero-knowledge proofs and the x402 protocol.
 
-## 🚀 Features
+## Features
 
-- **Anonymous Authentication**: Semaphore ZK identity (zkID) for privacy
-- **File Upload Auth**: zkID backup file system (no manual paste)
-- **Multi-Crypto Payments**: Support for BTC, ETH, SOL, USDT, USDC, etc.
-- **x402 Protocol**: Decentralized service marketplace on Base network
+- **Anonymous Authentication**: Semaphore Protocol v4 zero-knowledge identity system
+- **File-Based Identity**: Automatic backup file download for identity recovery
+- **Multi-Crypto Payments**: Support for BTC, ETH, SOL, USDT, USDC, and more
+- **x402 Protocol**: Decentralized service payments on Base network
 - **Purchase History**: Track all service purchases with blockchain verification
 - **Transaction History**: Monitor credit topups and spending
-- **Interactive Playground**: Test purchased services with real API calls
+- **Service Playground**: Test purchased services with interactive API interface
 
-## 📁 Project Structure
+## Technology Stack
 
-```
-x402marketplace/
-├── client/src/
-│   ├── pages/
-│   │   ├── X402Marketplace.tsx   # Main marketplace UI (901 lines)
-│   │   ├── X402Playground.tsx    # Service testing interface (330 lines)
-│   │   ├── Landing.tsx           # Homepage
-│   │   ├── Docs.tsx              # Documentation
-│   │   └── not-found.tsx         # 404 page
-│   ├── components/               # Shadcn UI components
-│   ├── lib/                      # React Query client & utilities
-│   └── App.tsx                   # Clean app with only x402 routes
-├── server/
-│   ├── x402-client.ts           # x402 protocol integration
-│   ├── db.ts                    # Database connection
-│   ├── storage.ts               # Data access layer
-│   ├── wallet.ts                # Crypto payment handling
-│   └── eth-wallet.ts            # Base network integration
-├── shared/
-│   └── schema.ts                # Database schema (x402 tables only)
-└── README.md                    # This file
-```
+**Frontend:**
+- React 18 with TypeScript
+- Vite build system
+- Wouter for routing
+- Shadcn UI component library
+- TanStack React Query for state management
 
-## 🗄️ Database Schema
+**Backend:**
+- Node.js with Express
+- Drizzle ORM with PostgreSQL
+- x402 protocol client
+- Multi-chain wallet integration (Solana, Base, Ethereum)
+
+**Blockchain:**
+- Semaphore Protocol for zero-knowledge proofs
+- Base network for x402 payments
+- Ethers.js for EVM interactions
+- Solana web3.js for SOL transactions
+
+## Database Schema
 
 - **users**: Anonymous user identities (zkCommitment, creditBalance)
 - **x402_services**: Available marketplace services
 - **x402_purchases**: User service purchase records
-- **credit_transactions**: Topup & spending history
+- **credit_transactions**: Topup and spending history
 
-## 🔐 Security
-
-- **Zero-Knowledge Authentication**: Semaphore Protocol v4
-- **No KYC Required**: Fully anonymous transactions
-- **zkID File Upload**: Secure identity management
-- **On-Chain Verification**: Base network transaction proof
-
-## 🛠️ Technology Stack
-
-- **Frontend**: React 18, TypeScript, Vite, Wouter, Shadcn UI
-- **Backend**: Node.js, Express, Drizzle ORM, PostgreSQL
-- **Blockchain**: Solana (swaps), Base (x402 protocol)
-- **ZK Proofs**: Semaphore Protocol
-- **Payment**: Multi-cryptocurrency support via zkSwap
-
-## 📝 API Endpoints
+## API Endpoints
 
 ### Authentication
-- `POST /api/x402/auth/register` - Register new zkID
-- `POST /api/x402/auth/login` - Login with zkID
+- `POST /api/x402/auth/register` - Register new zero-knowledge identity
+- `POST /api/x402/auth/login` - Login with zero-knowledge proof
 
 ### Services
 - `GET /api/x402/services` - List all available services
@@ -76,50 +57,62 @@ x402marketplace/
 ### Purchases
 - `GET /api/x402/purchases` - Get user purchase history
 
-## 🎯 Usage
+## Getting Started
 
-### 1. Generate zkID
-```typescript
-const identity = new Identity();
-const commitment = identity.commitment.toString();
-// Auto-downloads backup file: zkid-backup-{hash}.json
+1. Install dependencies:
+```bash
+npm install
 ```
 
-### 2. Top-Up Credits
-```typescript
-// Pay with any supported cryptocurrency
-// Converts to USDC on Base network automatically
+2. Set up environment variables:
+```bash
+DATABASE_URL=your_postgres_url
+EVM_HOT_WALLET_KEY=your_private_key
 ```
 
-### 3. Purchase Services
-```typescript
-// Browse marketplace → Select service → Purchase
-// Access granted instantly with zkID proof
+3. Push database schema:
+```bash
+npm run db:push
 ```
 
-### 4. Test Services
-```typescript
-// Use X402Playground to test purchased services
-// Make API calls anonymously with credit deduction
+4. Start development server:
+```bash
+npm run dev
 ```
 
-## 🌐 Routes
+## Usage
+
+### Generate Identity
+Create a new zero-knowledge identity that automatically downloads a backup file.
+
+### Top-Up Credits
+Pay with any supported cryptocurrency. Funds are converted to USDC on Base network.
+
+### Purchase Services
+Browse the marketplace, select services, and purchase anonymously using your zero-knowledge identity.
+
+### Test Services
+Use the playground interface to test purchased services with real API calls.
+
+## Security
+
+- Zero-knowledge authentication (no personal data stored)
+- Client-side identity generation
+- Blockchain transaction verification
+- No KYC requirements
+- Multi-signature wallet support
+
+## Routes
 
 - `/` - Landing page
 - `/docs` - Documentation
-- `/x402marketplace` - Main marketplace
+- `/x402marketplace` - Main marketplace interface
 - `/x402playground` - Service testing playground
 
-## 👨‍💻 Author
+## Author
 
 **Zekta** <dev@zekta.io>
 
-## 📄 License
+## License
 
-MIT License - See GitHub repository for details
-
-## 🔗 Links
-
-- GitHub: https://github.com/zektaio/zekta-x402
-- Documentation: Coming soon
-- x402 Protocol: https://x402.org
+MIT License
