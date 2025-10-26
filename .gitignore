@@ -1,63 +1,12 @@
-# Dependencies
 node_modules
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Build outputs
 dist
-build
-.vite
-server/public
-
-# Environment
 .env
 .env.local
-.env.*.local
-
-# OS files
 .DS_Store
-Thumbs.db
-
-# Editor
+*.log
+coverage
 .vscode
 .idea
 *.swp
 *.swo
-*~
-
-# Cache & temporary
-.cache/
-.local/
-.config/
-.upm/
-*.tar.gz
-
-# Replit specific (exclude from repository)
-.replit
-replit.nix
-replit.md
-
-# Development files (not for production)
-Anchor.toml
-Cargo.toml
-programs/
-sdk/
-target/
-convert-key.js
-attached_assets/
-
-# GitHub
-.github/
-
-# Database
-*.db
-*.sqlite
-
-# Tests
-coverage/
-.nyc_output/
-
-# Misc
-vite.config.ts.*
+.cache
