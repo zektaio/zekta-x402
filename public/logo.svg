@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="zekta-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Shield outer shape -->
+  <path d="M256 48L96 112V256C96 368 176 448 256 464C336 448 416 368 416 256V112L256 48Z" 
+        fill="url(#zekta-gradient)" opacity="0.2"/>
+  
+  <!-- Shield border -->
+  <path d="M256 48L96 112V256C96 368 176 448 256 464C336 448 416 368 416 256V112L256 48Z" 
+        stroke="url(#zekta-gradient)" stroke-width="16" fill="none"/>
+  
+  <!-- ZK letters -->
+  <g fill="url(#zekta-gradient)">
+    <!-- Z -->
+    <path d="M180 200L260 200L180 280L260 280" stroke="url(#zekta-gradient)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    
+    <!-- K -->
+    <path d="M280 200L280 280M280 240L340 200M280 240L340 280" stroke="url(#zekta-gradient)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+</svg>

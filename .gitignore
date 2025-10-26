@@ -1,0 +1,27 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+
+# Replit files
+.replit
+replit.nix
+replit.md
+
+# Development files
+Anchor.toml
+Cargo.toml
+programs/
+sdk/
+target/
+convert-key.js
+attached_assets/
+
+# Cache
+.cache/
+.local/
+.config/
+.upm/
+.github/
