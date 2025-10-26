@@ -9,7 +9,7 @@ const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/docs', label: 'Docs' },
   { href: '/mvp', label: 'Launch MVP' },
-  { href: '/x402', label: 'x402 Marketplace' },
+  { href: '/x402marketplace', label: 'x402 Marketplace' },
   { href: '/domain-feature', label: 'Anonymous Domains' },
   { href: '/my-domains', label: 'My Domains' },
   { href: '/bugs', label: 'Bug Reports' },
